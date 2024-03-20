@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.ywg.hikdev.entity.access.AccessPeople;
 import com.ywg.hikdev.entity.QueryRequest;
 
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 
 
@@ -38,7 +39,7 @@ public interface IHikUserService {
      * @param people jsonObject
      * @return JSONObject
      */
-    JSONObject addUserInfo(String ip, AccessPeople people);
+    JSONObject addUserInfo(String ip, AccessPeople people) throws InterruptedException, UnsupportedEncodingException;
 
     /**
      * 修改用户
@@ -54,7 +55,7 @@ public interface IHikUserService {
      * @param peopleList 用户列表
      * @return JSONObject
      */
-    JSONObject addMultiUserInfo(String ip, List<AccessPeople> peopleList);
+    JSONObject addMultiUserInfo(String ip, List<AccessPeople> peopleList) throws UnsupportedEncodingException, InterruptedException;
 
     /**
      * 查询人脸信息

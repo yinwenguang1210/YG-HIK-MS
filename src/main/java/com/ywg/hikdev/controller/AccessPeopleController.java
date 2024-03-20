@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 
 /**
@@ -21,7 +22,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("api/access/people")
-@Deprecated
+//@Deprecated
 public class AccessPeopleController {
 
     private final IHikUserService hikUserService;
@@ -65,9 +66,9 @@ public class AccessPeopleController {
      * @param people 工号和真实姓名
      * @return
      */
-    @Deprecated
+//    @Deprecated
     @PostMapping("addPeople/{ip}")
-    public JSONObject addPeople(@PathVariable String ip, @RequestBody AccessPeople people) {
+    public JSONObject addPeople(@PathVariable String ip, @RequestBody AccessPeople people) throws UnsupportedEncodingException, InterruptedException {
         return this.hikUserService.addUserInfo(ip, people);
     }
 
@@ -93,7 +94,7 @@ public class AccessPeopleController {
      */
     @Deprecated
     @PostMapping("addMultiPeople/{ip}")
-    public JSONObject addMultiPeople(@PathVariable String ip, @RequestBody List<AccessPeople> peopleList) {
+    public JSONObject addMultiPeople(@PathVariable String ip, @RequestBody List<AccessPeople> peopleList) throws UnsupportedEncodingException, InterruptedException {
         return this.hikUserService.addMultiUserInfo(ip, peopleList);
     }
 

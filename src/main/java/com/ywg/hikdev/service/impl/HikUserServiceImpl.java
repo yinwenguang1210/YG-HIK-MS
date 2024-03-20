@@ -10,6 +10,7 @@ import com.ywg.hikdev.entity.QueryRequest;
 import com.ywg.hikdev.entity.access.RightPlan;
 import com.ywg.hikdev.entity.access.UserInfoSearch;
 import com.ywg.hikdev.entity.access.Valid;
+import com.ywg.hikdev.service.HCNetSDK;
 import com.ywg.hikdev.service.IHikDevService;
 import com.ywg.hikdev.service.IHikUserService;
 import com.ywg.hikdev.structure.BYTE_ARRAY;
@@ -102,9 +103,111 @@ public class HikUserServiceImpl implements IHikUserService {
     }
 
     @Override
-    public JSONObject addUserInfo(String ip, AccessPeople people) {
-        String urlInBuffer = "POST /ISAPI/AccessControl/UserInfo/Record?format=json";
-        return this.aboutUserInfo(ip, people, urlInBuffer);
+    public JSONObject addUserInfo(String ip, AccessPeople people) throws InterruptedException, UnsupportedEncodingException {
+        JSONObject result = new JSONObject();
+        HCNetSDK.BYTE_ARRAY ptrByteArray = new HCNetSDK.BYTE_ARRAY(1024);    //数组
+        String strInBuffer = "PUT /ISAPI/AccessControl/UserInfo/SetUp?format=json";
+        System.arraycopy(strInBuffer.getBytes(), 0, ptrByteArray.byValue, 0, strInBuffer.length());//字符串拷贝到数组中
+        ptrByteArray.write();
+        Integer longUserId = ConfigJsonUtil.getDeviceSearchInfoByIp(ip).getLoginId();
+        int lHandler = this.hikDevService.NET_DVR_StartRemoteConfig(longUserId, HCNetSDK.NET_DVR_JSON_CONFIG, ptrByteArray.getPointer(), strInBuffer.length(), null, null);
+        if (lHandler < 0) {
+            result.put("code", -1);
+            result.put("msg", "AddUserInfo NET_DVR_StartRemoteConfig 失败,错误码为" + this.hikDevService.NET_DVR_GetLastError());
+            return result;
+        } else {
+            System.out.println("AddUserInfo NET_DVR_StartRemoteConfig 成功!");
+
+            byte[] Name = people.getRealName().getBytes("utf-8"); //根据iCharEncodeType判断，如果iCharEncodeType返回6，则是UTF-8编码。
+            //如果是0或者1或者2，则是GBK编码
+
+            //将中文字符编码之后用数组拷贝的方式，避免因为编码导致的长度问题
+            String strInBuffer1 = "{\n" +
+                    "    \"UserInfo\":{\n" +
+                    "        \"employeeNo\":\""+people.getEmployeeNo()+"\",\n" +
+                    "        \"name\":\"";
+            String strInBuffer2 = "\",\n" +
+                    "        \"userType\":\"normal\",\n" +
+                    "        \"Valid\":{\n" +
+                    "            \"enable\":true,\n" +
+                    "            \"beginTime\":\"2019-08-01T17:30:08\",\n" +
+                    "            \"endTime\":\"2030-08-01T17:30:08\",\n" +
+                    "            \"timeType\":\"local\"\n" +
+                    "        },\n" +
+                    "        \"belongGroup\":\"1\",\n" +
+                    "        \"doorRight\":\"1\",\n" +
+                    "        \"RightPlan\":[\n" +
+                    "            {\n" +
+                    "                \"doorNo\":1,\n" +
+                    "                \"planTemplateNo\":\"1\"\n" +
+                    "            }\n" +
+                    "        ]\n" +
+                    "    }\n" +
+                    "}";
+            int iStringSize = Name.length + strInBuffer1.length() + strInBuffer2.length();
+
+            HCNetSDK.BYTE_ARRAY ptrByte = new HCNetSDK.BYTE_ARRAY(iStringSize);
+            System.arraycopy(strInBuffer1.getBytes(), 0, ptrByte.byValue, 0, strInBuffer1.length());
+            System.arraycopy(Name, 0, ptrByte.byValue, strInBuffer1.length(), Name.length);
+            System.arraycopy(strInBuffer2.getBytes(), 0, ptrByte.byValue, strInBuffer1.length() + Name.length, strInBuffer2.length());
+            ptrByte.write();
+
+            System.out.println(new String(ptrByte.byValue));
+
+            HCNetSDK.BYTE_ARRAY ptrOutuff = new HCNetSDK.BYTE_ARRAY(1024);
+
+            IntByReference pInt = new IntByReference(0);
+            while (true) {
+                int dwState = this.hikDevService.NET_DVR_SendWithRecvRemoteConfig(lHandler, ptrByte.getPointer(), iStringSize, ptrOutuff.getPointer(), 1024, pInt);
+                if (dwState == -1) {
+                    System.out.println("NET_DVR_SendWithRecvRemoteConfig接口调用失败，错误码：" + this.hikDevService.NET_DVR_GetLastError());
+                    break;
+                }
+                //读取返回的json并解析
+                ptrOutuff.read();
+                String strResult = new String(ptrOutuff.byValue).trim();
+                System.out.println("dwState:" + dwState + ",strResult:" + strResult);
+
+                Map<String, String> map = new HashMap<>(); // 创建一个HashMap对象
+                map.put("strResult", strResult); // 将字符串值赋给键
+                JSONObject jsonResult = new JSONObject(map);
+                int statusCode = jsonResult.getIntValue("statusCode");
+                String statusString = jsonResult.getString("statusString");
+
+                if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_NEED_WAIT) {
+                    System.out.println("配置等待");
+                    Thread.sleep(10);
+                    continue;
+                } else if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_FAILED) {
+                    System.out.println("下发人员失败, json retun:" + jsonResult.toString());
+                    break;
+                } else if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_EXCEPTION) {
+                    System.out.println("下发人员异常, json retun:" + jsonResult.toString());
+                    break;
+                } else if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_SUCCESS) {//返回NET_SDK_CONFIG_STATUS_SUCCESS代表流程走通了，但并不代表下发成功，比如有些设备可能因为人员已存在等原因下发失败，所以需要解析Json报文
+                    if (statusCode != 1) {
+                        System.out.println("下发人员成功,但是有异常情况:" + jsonResult.toString());
+                    } else {
+                        System.out.println("下发人员成功: json retun:" + jsonResult.toString());
+                    }
+                    break;
+                } else if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_FINISH) {
+                    //下发人员时：dwState其实不会走到这里，因为设备不知道我们会下发多少个人，所以长连接需要我们主动关闭
+                    System.out.println("下发人员完成");
+                    break;
+                }
+            }
+            if (!this.hikDevService.NET_DVR_StopRemoteConfig(lHandler)) {
+                result.put("code", -1);
+                result.put("msg", "NET_DVR_StopRemoteConfig接口调用失败，错误码：" + this.hikDevService.NET_DVR_GetLastError());
+                return result;
+            } else {
+                result.put("code", 0);
+                result.put("msg", "NET_DVR_StopRemoteConfig接口成功");
+                return result;
+            }
+        }
+
     }
 
     @Override
@@ -131,7 +234,7 @@ public class HikUserServiceImpl implements IHikUserService {
     }
 
     @Override
-    public JSONObject addMultiUserInfo(String ip, List<AccessPeople> peopleList) {
+    public JSONObject addMultiUserInfo(String ip, List<AccessPeople> peopleList) throws UnsupportedEncodingException, InterruptedException {
         JSONObject result = new JSONObject();
         for (AccessPeople people : peopleList) {
             result = this.addUserInfo(ip, people);
