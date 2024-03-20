@@ -35,4 +35,8 @@ public class AccessControlUser implements Serializable {
      * base64图片
      */
     private String base64Pic;
+    /**
+     * 多个设备
+     */
+    private String[] deviceIPs;
 }

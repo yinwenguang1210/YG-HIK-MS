@@ -12,6 +12,7 @@ import com.ywg.hikdev.entity.access.RightPlan;
 import com.ywg.hikdev.entity.access.UserInfoSearch;
 import com.ywg.hikdev.entity.access.Valid;
 import com.ywg.hikdev.entity.param.AccessControlUser;
+import com.ywg.hikdev.service.HCNetSDK;
 import com.ywg.hikdev.service.IHikAccessControlService;
 import com.ywg.hikdev.service.IHikDevService;
 import com.ywg.hikdev.structure.*;
@@ -902,6 +903,226 @@ public class HikAccessControlServiceImpl implements IHikAccessControlService {
             log.info("输出结果:" + strJson);
         }
         return result;
+    }
+
+    @Override
+    public HikDevResponse addDevicesForPerson(AccessControlUser accessControlUser) throws InterruptedException, UnsupportedEncodingException {
+        HikDevResponse result = new HikDevResponse();
+
+        //循环写入
+        for(String deviceIP : accessControlUser.getDeviceIPs()) {
+
+            //以下代码是下发人员
+            result = writePeople(accessControlUser, result, deviceIP);
+
+            //以下代码是下发多个设备（目前是门禁）
+            result = writeDevices(accessControlUser, result, deviceIP);
+
+        }
+
+        return result;
+    }
+
+    private HikDevResponse writePeople(AccessControlUser accessControlUser, HikDevResponse result, String deviceIP) throws UnsupportedEncodingException, InterruptedException {
+        HCNetSDK.BYTE_ARRAY ptrByteArray = new HCNetSDK.BYTE_ARRAY(1024);    //数组
+        String strInBuffer = "PUT /ISAPI/AccessControl/UserInfo/SetUp?format=json";
+        System.arraycopy(strInBuffer.getBytes(), 0, ptrByteArray.byValue, 0, strInBuffer.length());//字符串拷贝到数组中
+        ptrByteArray.write();
+        Integer longUserId = ConfigJsonUtil.getDeviceSearchInfoByIp(deviceIP).getLoginId();
+        int lHandler = this.hikDevService.NET_DVR_StartRemoteConfig(longUserId, HCNetSDK.NET_DVR_JSON_CONFIG, ptrByteArray.getPointer(), strInBuffer.length(), null, null);
+        if (lHandler < 0) {
+            result.put("code", -1);
+            result.put("msg", "AddUserInfo NET_DVR_StartRemoteConfig 失败,错误码为" + this.hikDevService.NET_DVR_GetLastError());
+            return result;
+        } else {
+            System.out.println("AddUserInfo NET_DVR_StartRemoteConfig 成功!");
+
+            byte[] Name = accessControlUser.getRealName().getBytes("utf-8"); //根据iCharEncodeType判断，如果iCharEncodeType返回6，则是UTF-8编码。
+            //如果是0或者1或者2，则是GBK编码
+
+            //将中文字符编码之后用数组拷贝的方式，避免因为编码导致的长度问题
+            String strInBuffer1 = "{\n" +
+                    "    \"UserInfo\":{\n" +
+                    "        \"employeeNo\":\""+ accessControlUser.getEmployeeNo()+"\",\n" +
+                    "        \"name\":\"";
+            String strInBuffer2 = "\",\n" +
+                    "        \"userType\":\"normal\",\n" +
+                    "        \"Valid\":{\n" +
+                    "            \"enable\":true,\n" +
+                    "            \"beginTime\":\"2019-08-01T17:30:08\",\n" +
+                    "            \"endTime\":\"2030-08-01T17:30:08\",\n" +
+                    "            \"timeType\":\"local\"\n" +
+                    "        },\n" +
+                    "        \"belongGroup\":\"1\",\n" +
+                    "        \"doorRight\":\"1\",\n" +
+                    "        \"RightPlan\":[\n" +
+                    "            {\n" +
+                    "                \"doorNo\":1,\n" +
+                    "                \"planTemplateNo\":\"1\"\n" +
+                    "            }\n" +
+                    "        ]\n" +
+                    "    }\n" +
+                    "}";
+            int iStringSize = Name.length + strInBuffer1.length() + strInBuffer2.length();
+
+            HCNetSDK.BYTE_ARRAY ptrByte = new HCNetSDK.BYTE_ARRAY(iStringSize);
+            System.arraycopy(strInBuffer1.getBytes(), 0, ptrByte.byValue, 0, strInBuffer1.length());
+            System.arraycopy(Name, 0, ptrByte.byValue, strInBuffer1.length(), Name.length);
+            System.arraycopy(strInBuffer2.getBytes(), 0, ptrByte.byValue, strInBuffer1.length() + Name.length, strInBuffer2.length());
+            ptrByte.write();
+
+            System.out.println(new String(ptrByte.byValue));
+
+            HCNetSDK.BYTE_ARRAY ptrOutuff = new HCNetSDK.BYTE_ARRAY(1024);
+
+            IntByReference pInt = new IntByReference(0);
+            while (true) {
+                int dwState = this.hikDevService.NET_DVR_SendWithRecvRemoteConfig(lHandler, ptrByte.getPointer(), iStringSize, ptrOutuff.getPointer(), 1024, pInt);
+                if (dwState == -1) {
+                    System.out.println("NET_DVR_SendWithRecvRemoteConfig接口调用失败，错误码：" + this.hikDevService.NET_DVR_GetLastError());
+                    break;
+                }
+                //读取返回的json并解析
+                ptrOutuff.read();
+                String strResult = new String(ptrOutuff.byValue).trim();
+                System.out.println("dwState:" + dwState + ",strResult:" + strResult);
+
+                Map<String, String> map = new HashMap<>(); // 创建一个HashMap对象
+                map.put("strResult", strResult); // 将字符串值赋给键
+                JSONObject jsonResult = new JSONObject(map);
+                int statusCode = jsonResult.getIntValue("statusCode");
+                String statusString = jsonResult.getString("statusString");
+
+                if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_NEED_WAIT) {
+                    System.out.println("配置等待");
+                    Thread.sleep(10);
+                    continue;
+                } else if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_FAILED) {
+                    System.out.println("下发人员失败, json retun:" + jsonResult.toString());
+                    break;
+                } else if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_EXCEPTION) {
+                    System.out.println("下发人员异常, json retun:" + jsonResult.toString());
+                    break;
+                } else if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_SUCCESS) {//返回NET_SDK_CONFIG_STATUS_SUCCESS代表流程走通了，但并不代表下发成功，比如有些设备可能因为人员已存在等原因下发失败，所以需要解析Json报文
+                    if (statusCode != 1) {
+                        System.out.println("下发人员成功,但是有异常情况:" + jsonResult.toString());
+                    } else {
+                        System.out.println("下发人员成功: json retun:" + jsonResult.toString());
+                    }
+                    break;
+                } else if (dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_FINISH) {
+                    //下发人员时：dwState其实不会走到这里，因为设备不知道我们会下发多少个人，所以长连接需要我们主动关闭
+                    System.out.println("下发人员完成");
+                    break;
+                }
+            }
+            if (!this.hikDevService.NET_DVR_StopRemoteConfig(lHandler)) {
+                result.put("code", -1);
+                result.put("msg", "NET_DVR_StopRemoteConfig接口调用失败，错误码：" + this.hikDevService.NET_DVR_GetLastError());
+                return result;
+            } else {
+                result.put("code", 0);
+                result.put("msg", "NET_DVR_StopRemoteConfig接口成功");
+                return result;
+            }
+        }
+    }
+
+    private HikDevResponse writeDevices(AccessControlUser accessControlUser, HikDevResponse result, String deviceIP) {
+        HCNetSDK.BYTE_ARRAY ptrByteArray = new HCNetSDK.BYTE_ARRAY(1024);    //数组
+        String strInBuffer = "POST /ISAPI/AccessControl/CardInfo/Record?format=json";
+        System.arraycopy(strInBuffer.getBytes(), 0, ptrByteArray.byValue, 0, strInBuffer.length());//字符串拷贝到数组中
+        ptrByteArray.write();
+
+        Integer longUserId = ConfigJsonUtil.getDeviceSearchInfoByIp(deviceIP).getLoginId();
+        int lHandler = hikDevService.NET_DVR_StartRemoteConfig(longUserId, HCNetSDK.NET_DVR_JSON_CONFIG, ptrByteArray.getPointer(), strInBuffer.length(), null, null);
+        if (lHandler < 0)
+        {
+            System.out.println("AddCardInfo NET_DVR_StartRemoteConfig 失败,错误码为"+hikDevService.NET_DVR_GetLastError());
+            return result;
+        }
+        else{
+            System.out.println("AddCardInfo NET_DVR_StartRemoteConfig 成功!");
+            HCNetSDK.BYTE_ARRAY lpInput = new HCNetSDK.BYTE_ARRAY(1024);    //数组
+            String strJsonData = "{\n" +
+                    "    \"CardInfo\" : {\n" +
+                    "        \"employeeNo\":\""+ accessControlUser.getEmployeeNo()+"\", \n" +
+                    "        \"cardNo\":\""+ accessControlUser.getCardNo()+"\", \n" +
+                    "        \"cardType\":\"normalCard\"\n" +
+                    "        } \n" +
+                    "}";
+            System.arraycopy(strJsonData.getBytes(), 0, lpInput.byValue, 0, strJsonData.length());//字符串拷贝到数组中
+            lpInput.write();
+            HCNetSDK.BYTE_ARRAY ptrOutuff = new HCNetSDK.BYTE_ARRAY(1024);
+            IntByReference pInt = new IntByReference(0);
+            while(true){
+            /*
+                如果需要批量下发，循环调用NET_DVR_SendWithRecvRemoteConfig接口进行下发不同的卡号，下发结束完成后关闭下发卡号长连接
+             */
+                int dwState = hikDevService.NET_DVR_SendWithRecvRemoteConfig(lHandler, lpInput.getPointer(), lpInput.byValue.length ,ptrOutuff.getPointer(), 1024,  pInt);
+                //读取返回的json并解析
+                ptrOutuff.read();
+                String strResult = new String(ptrOutuff.byValue).trim();
+                System.out.println("dwState:" + dwState + ",strResult:" + strResult);
+
+                Map<String, String> map = new HashMap<>(); // 创建一个HashMap对象
+                map.put("strResult", strResult); // 将字符串值赋给键
+                JSONObject jsonResult = new JSONObject(map);
+                int statusCode = jsonResult.getIntValue("statusCode");
+                String statusString = jsonResult.getString("statusString");
+
+                if(dwState == -1){
+                    System.out.println("NET_DVR_SendWithRecvRemoteConfig接口调用失败，错误码：" + hikDevService.NET_DVR_GetLastError());
+                    break;
+                }
+                else if(dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_NEED_WAIT)
+                {
+                    System.out.println("配置等待");
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    continue;
+                }
+                else if(dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_FAILED)
+                {
+                    System.out.println("下发卡号失败, json retun:" + jsonResult.toString());
+                    break;
+                }
+                else if(dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_EXCEPTION)
+                {
+                    System.out.println("下发卡号异常, json retun:" + jsonResult.toString());
+                    break;
+                }
+                else if(dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_SUCCESS)
+                {
+                    if (statusCode != 1){
+                        System.out.println("下发卡号成功,但是有异常情况:" + jsonResult.toString());
+                    }
+                    else{
+                        System.out.println("下发卡号成功,  json retun:" + jsonResult.toString());
+                    }
+                    break;
+                }
+                else if(dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_FINISH) {
+
+                    System.out.println("下发卡号完成");
+                    break;
+                }
+            }
+            if(!hikDevService.NET_DVR_StopRemoteConfig(lHandler)){
+                System.out.println("NET_DVR_StopRemoteConfig接口调用失败，错误码：" + hikDevService.NET_DVR_GetLastError());
+                result.put("code", -1);
+                result.put("msg", "NET_DVR_StopRemoteConfig接口调用失败，错误码：" + hikDevService.NET_DVR_GetLastError());
+            }
+            else{
+                System.out.println("NET_DVR_StopRemoteConfig接口成功");
+                result.put("code", 0);
+                result.put("msg", "NET_DVR_StopRemoteConfig接口成功");
+            }
+        }
+        return null;
     }
 
 }

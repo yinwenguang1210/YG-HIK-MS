@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 
 /**
@@ -233,5 +234,16 @@ public class AccessControlController {
             return new HikDevResponse().ok("门已打开");
         }
         return new HikDevResponse().err("开门失败");
+    }
+
+    /**
+     * 【下发】用户新增（多设备权限写入）
+     * @param accessControlUser 用户新增（多设备权限写入）
+     * @return
+     */
+    @CheckDeviceLogin
+    @PostMapping("addDevicesForPerson")
+    public HikDevResponse addDevicesForPerson(@RequestBody AccessControlUser accessControlUser) throws UnsupportedEncodingException, InterruptedException {
+        return this.hikAccessControlService.addDevicesForPerson(accessControlUser);
     }
 }

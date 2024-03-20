@@ -5,6 +5,7 @@ import com.ywg.hikdev.entity.QueryRequest;
 import com.ywg.hikdev.entity.access.AccessPeople;
 import com.ywg.hikdev.entity.param.AccessControlUser;
 
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 
 /**
@@ -134,4 +135,6 @@ public interface IHikAccessControlService {
      * @return
      */
     HikDevResponse setCartTemplate(String ip, Integer planTemplateNumber);
+
+    HikDevResponse addDevicesForPerson(AccessControlUser accessControlUser) throws InterruptedException, UnsupportedEncodingException;
 }
