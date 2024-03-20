@@ -1,10 +1,15 @@
 package com.ywg.hikdev.controller;
 
 import com.alibaba.fastjson2.JSONObject;
+import com.ywg.hikdev.annotation.CheckDeviceLogin;
+import com.ywg.hikdev.entity.HikDevResponse;
+import com.ywg.hikdev.entity.param.AccessControlUser;
 import com.ywg.hikdev.service.IHikCardService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 门禁 以卡为中心
@@ -15,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("api/access/card")
-@Deprecated
+//@Deprecated
 public class AccessCardController {
     private final IHikCardService hikCardService;
 
@@ -38,6 +43,17 @@ public class AccessCardController {
     @GetMapping("selectCardInfoByDeviceIp")
     public JSONObject selectCardInfoByDeviceIp(String ip) {
         return this.hikCardService.selectCardInfoByDeviceIp(ip);
+    }
+
+    /**
+     * 下发卡信息
+     * @param ipv4Address
+     * @param accessControlUser
+     * @return
+     */
+    @PostMapping("addCard/{ipv4Address}")
+    public JSONObject addCard(@PathVariable String ipv4Address, @RequestBody AccessControlUser accessControlUser) {
+        return this.hikCardService.addCard(ipv4Address, accessControlUser);
     }
 
     /**

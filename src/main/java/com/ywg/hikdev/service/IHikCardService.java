@@ -1,6 +1,8 @@
 package com.ywg.hikdev.service;
 
 import com.alibaba.fastjson2.JSONObject;
+import com.ywg.hikdev.entity.param.AccessControlUser;
+import org.springframework.web.bind.annotation.RequestBody;
 
 /**
  * @author ywg
@@ -33,6 +35,7 @@ public interface IHikCardService {
      */
     JSONObject selectCardInfoByDeviceIp(String ip);
 
+    JSONObject addCard(String ipv4Address, AccessControlUser accessControlUser);
     /**
      * 批量下发门禁卡
      *
