@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("api/access/card")
-//@Deprecated
+@Deprecated
 public class AccessCardController {
     private final IHikCardService hikCardService;
 
@@ -51,6 +51,7 @@ public class AccessCardController {
      * @param accessControlUser
      * @return
      */
+    @Deprecated
     @PostMapping("addCard/{ipv4Address}")
     public JSONObject addCard(@PathVariable String ipv4Address, @RequestBody AccessControlUser accessControlUser) {
         return this.hikCardService.addCard(ipv4Address, accessControlUser);
