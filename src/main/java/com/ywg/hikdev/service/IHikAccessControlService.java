@@ -137,4 +137,6 @@ public interface IHikAccessControlService {
     HikDevResponse setCartTemplate(String ip, Integer planTemplateNumber);
 
     HikDevResponse addDevicesForPerson(AccessControlUser accessControlUser) throws InterruptedException, UnsupportedEncodingException;
+
+    HikDevResponse delDevicesForPerson(String employeeNo, String [] deviceIPs);
 }
