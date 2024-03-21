@@ -238,12 +238,24 @@ public class AccessControlController {
 
     /**
      * 【下发】用户新增（多设备权限写入）
-     * @param accessControlUser 用户新增（多设备权限写入）
+     * @param accessControlUser
      * @return
+     * @throws UnsupportedEncodingException
+     * @throws InterruptedException
      */
-    @CheckDeviceLogin
     @PostMapping("addDevicesForPerson")
     public HikDevResponse addDevicesForPerson(@RequestBody AccessControlUser accessControlUser) throws UnsupportedEncodingException, InterruptedException {
         return this.hikAccessControlService.addDevicesForPerson(accessControlUser);
+    }
+
+    /**
+     * 【删除】根据工号删除对应设备里的用户
+     * @param employeeNo
+     * @param deviceIPs
+     * @return
+     */
+    @DeleteMapping("delDevicesForPerson/{employeeNo}")
+    public HikDevResponse delDevicesForPerson(@PathVariable String employeeNo, String [] deviceIPs) {
+        return this.hikAccessControlService.delDevicesForPerson(employeeNo, deviceIPs);
     }
 }

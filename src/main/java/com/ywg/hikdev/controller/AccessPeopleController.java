@@ -22,7 +22,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("api/access/people")
-//@Deprecated
+@Deprecated
 public class AccessPeopleController {
 
     private final IHikUserService hikUserService;
@@ -66,7 +66,7 @@ public class AccessPeopleController {
      * @param people 工号和真实姓名
      * @return
      */
-//    @Deprecated
+    @Deprecated
     @PostMapping("addPeople/{ip}")
     public JSONObject addPeople(@PathVariable String ip, @RequestBody AccessPeople people) throws UnsupportedEncodingException, InterruptedException {
         return this.hikUserService.addUserInfo(ip, people);
