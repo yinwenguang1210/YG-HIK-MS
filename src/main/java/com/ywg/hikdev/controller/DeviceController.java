@@ -108,7 +108,7 @@ public class DeviceController {
      * @return
      */
     @GetMapping("getDeviceSearchInfoList")
-    public HikDevResponse getDeviceSearchInfoList(@RequestHeader(value="token") String token, QueryRequest queryRequest, DeviceSearchInfo deviceSearchInfo) throws Exception {
+    public HikDevResponse getDeviceSearchInfoList(@RequestHeader(value="Authorization") String token, QueryRequest queryRequest, DeviceSearchInfo deviceSearchInfo) throws Exception {
         tokenService.securityCheck(token);
 
         int pageNum = queryRequest.getPageNum();
@@ -329,7 +329,7 @@ public class DeviceController {
      * @return
      */
     @GetMapping("getAllAccessDataById/{id}")
-    public HikDevResponse getAllAccessDataById(@RequestHeader(value="token") String token, @PathVariable Integer id, Integer length) throws Exception {
+    public HikDevResponse getAllAccessDataById(@RequestHeader(value="Authorization") String token, @PathVariable Integer id, Integer length) throws Exception {
         tokenService.securityCheck(token);
         JSONObject jsonObject = new JSONObject();
         return new HikDevResponse().ok("查询成功",jsonObject);

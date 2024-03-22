@@ -245,7 +245,7 @@ public class AccessControlController {
      * @throws InterruptedException
      */
     @PostMapping("addDevicesForPerson")
-    public HikDevResponse addDevicesForPerson(@RequestHeader(value="token") String token, @RequestBody AccessControlUser accessControlUser) throws Exception {
+    public HikDevResponse addDevicesForPerson(@RequestHeader(value="Authorization") String token, @RequestBody AccessControlUser accessControlUser) throws Exception {
         tokenService.securityCheck(token);
         return this.hikAccessControlService.addDevicesForPerson(accessControlUser);
     }
@@ -257,7 +257,7 @@ public class AccessControlController {
      * @return
      */
     @DeleteMapping("delDevicesForPerson/{employeeNo}")
-    public HikDevResponse delDevicesForPerson(@RequestHeader(value="token") String token, @PathVariable String employeeNo, String [] deviceIPs) throws Exception {
+    public HikDevResponse delDevicesForPerson(@RequestHeader(value="Authorization") String token, @PathVariable String employeeNo, String [] deviceIPs) throws Exception {
         tokenService.securityCheck(token);
         return this.hikAccessControlService.delDevicesForPerson(employeeNo, deviceIPs);
     }
