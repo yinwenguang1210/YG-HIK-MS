@@ -2,6 +2,7 @@ package com.ywg.hikdev.controller;
 
 import cn.hutool.core.util.StrUtil;
 import com.ywg.hikdev.annotation.CheckDeviceLogin;
+import com.ywg.hikdev.config.TokenService;
 import com.ywg.hikdev.entity.HikDevResponse;
 import com.ywg.hikdev.entity.QueryRequest;
 import com.ywg.hikdev.entity.access.AccessPeople;
@@ -28,7 +29,7 @@ public class AccessControlController {
     private final IHikAccessControlService hikAccessControlService;
 
     private final IHikDevService hikDevService;
-
+    private final TokenService tokenService;
 
     /**
      * 【卡】根据设备序列号deviceSn查询所有卡信息
@@ -244,7 +245,8 @@ public class AccessControlController {
      * @throws InterruptedException
      */
     @PostMapping("addDevicesForPerson")
-    public HikDevResponse addDevicesForPerson(@RequestBody AccessControlUser accessControlUser) throws UnsupportedEncodingException, InterruptedException {
+    public HikDevResponse addDevicesForPerson(@RequestHeader(value="token") String token, @RequestBody AccessControlUser accessControlUser) throws Exception {
+        tokenService.securityCheck(token);
         return this.hikAccessControlService.addDevicesForPerson(accessControlUser);
     }
 
@@ -255,7 +257,8 @@ public class AccessControlController {
      * @return
      */
     @DeleteMapping("delDevicesForPerson/{employeeNo}")
-    public HikDevResponse delDevicesForPerson(@PathVariable String employeeNo, String [] deviceIPs) {
+    public HikDevResponse delDevicesForPerson(@RequestHeader(value="token") String token, @PathVariable String employeeNo, String [] deviceIPs) throws Exception {
+        tokenService.securityCheck(token);
         return this.hikAccessControlService.delDevicesForPerson(employeeNo, deviceIPs);
     }
 }

@@ -3,21 +3,22 @@ package com.ywg.hikdev.controller;
 import cn.hutool.core.codec.Base64;
 import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.map.MapUtil;
-import cn.hutool.core.util.*;
+import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.PageUtil;
+import cn.hutool.json.JSONObject;
+import com.sun.jna.ptr.IntByReference;
 import com.ywg.hikdev.annotation.CheckDeviceLogin;
 import com.ywg.hikdev.component.FileStream;
+import com.ywg.hikdev.config.TokenService;
+import com.ywg.hikdev.entity.HikDevResponse;
 import com.ywg.hikdev.entity.QueryRequest;
 import com.ywg.hikdev.entity.config.DeviceInfoDTO;
 import com.ywg.hikdev.entity.config.DeviceLoginDTO;
-import com.ywg.hikdev.entity.HikDevResponse;
 import com.ywg.hikdev.entity.config.DeviceSearchInfo;
-import com.ywg.hikdev.service.*;
-import com.ywg.hikdev.structure.*;
 import com.ywg.hikdev.service.*;
 import com.ywg.hikdev.structure.NET_DVR_JPEGPARA;
 import com.ywg.hikdev.util.ConfigJsonUtil;
 import com.ywg.hikdev.util.RtspServerHttpUtil;
-import com.sun.jna.ptr.IntByReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,6 +46,7 @@ public class DeviceController {
     private final IHikDevService hikDevService;
     private final FileStream fileStream;
     private final IRtspServerService rtspServerService;
+    private final TokenService tokenService;
 
     @Value("${hik-dev.output-dir}")
     private String outputDir;
@@ -66,6 +68,7 @@ public class DeviceController {
      * @param deviceInfoDTO 设备基本信息
      * @return
      */
+    @Deprecated
     @PostMapping("modifyDeviceInfo")
     public HikDevResponse modifyDeviceInfo(@Valid @RequestBody DeviceInfoDTO deviceInfoDTO) {
         return this.hikDeviceService.modifyDeviceInfo(deviceInfoDTO) ? new HikDevResponse().ok().msg("修改成功") : new HikDevResponse().err().msg("修改失败");
@@ -79,6 +82,7 @@ public class DeviceController {
      * @param ipv4Address 设备ip
      * @return 登录结果 true/false
      */
+    @Deprecated
     @GetMapping("getDeviceInfoByIp/{ipv4Address}")
     public HikDevResponse getDeviceInfoByIp(@PathVariable String ipv4Address) {
         DeviceSearchInfo deviceLogin = this.hikDeviceService.loginStatus(ipv4Address);
@@ -104,7 +108,9 @@ public class DeviceController {
      * @return
      */
     @GetMapping("getDeviceSearchInfoList")
-    public HikDevResponse getDeviceSearchInfoList(QueryRequest queryRequest, DeviceSearchInfo deviceSearchInfo) {
+    public HikDevResponse getDeviceSearchInfoList(@RequestHeader(value="token") String token, QueryRequest queryRequest, DeviceSearchInfo deviceSearchInfo) throws Exception {
+        tokenService.securityCheck(token);
+
         int pageNum = queryRequest.getPageNum();
         int pageSize = queryRequest.getPageSize();
 
@@ -123,6 +129,7 @@ public class DeviceController {
     /**
      * 主动同步（扫描）局域网设备
      */
+    @Deprecated
     @GetMapping("searchHikDevice")
     public HikDevResponse searchHikDevice() {
         ConfigJsonUtil.searchHikDevice();
@@ -134,6 +141,7 @@ public class DeviceController {
      *
      * @param ipv4Address 设备IP
      */
+    @Deprecated
     @CheckDeviceLogin
     @PostMapping("setupAlarm/{ipv4Address}")
     public HikDevResponse setupAlarm(@PathVariable String ipv4Address) {
@@ -145,6 +153,7 @@ public class DeviceController {
      *
      * @param ipv4Address 设备ip
      */
+    @Deprecated
     @CheckDeviceLogin
     @PostMapping("closeAlarm/{ipv4Address}")
     public HikDevResponse closeAlarm(@PathVariable String ipv4Address) {
@@ -159,6 +168,7 @@ public class DeviceController {
      * @param picSize     照片分辨率（尺寸）
      * @return base64
      */
+    @Deprecated
     @CheckDeviceLogin
     @GetMapping("captureJpegPictureToMemory/{ipv4Address}")
     public HikDevResponse captureJpegPictureToMemory(@PathVariable String ipv4Address, Integer channelId, Short picQuality, Short picSize) {
@@ -200,6 +210,7 @@ public class DeviceController {
      *
      * @param ipv4Address 设备ip
      */
+    @Deprecated
     @CheckDeviceLogin
     @GetMapping("captureJpegPictureToLocal/{ipv4Address}")
     public HikDevResponse captureJpegPictureToLocal(@PathVariable String ipv4Address, Integer channelId, Short picQuality, Short picSize) {
@@ -244,12 +255,14 @@ public class DeviceController {
      *
      * @return
      */
+    @Deprecated
     @GetMapping("getDeviceRtspList")
     public HikDevResponse getDeviceRtspList() {
         String streams = RtspServerHttpUtil.get("streams");
         return new HikDevResponse().ok().data(streams);
     }
 
+    @Deprecated
     @GetMapping("syncRtspStream")
     public HikDevResponse syncRtspStream() {
         this.rtspServerService.syncRtspStream();
@@ -261,6 +274,7 @@ public class DeviceController {
      *
      * @param ipv4Address 设备ip
      */
+    @Deprecated
     @CheckDeviceLogin
     @GetMapping("openPreview/{ipv4Address}")
     public HikDevResponse openPreview(@PathVariable String ipv4Address) {
@@ -277,6 +291,7 @@ public class DeviceController {
      * @param ipv4Address 设备IP
      * @return
      */
+    @Deprecated
     @PostMapping("startCameraRecord/{ipv4Address}")
     public String saveCameraData(@PathVariable String ipv4Address) {
         Integer previewSucValue = ConfigJsonUtil.getDeviceSearchInfoByIp(ipv4Address).getPreviewHandleId();
@@ -294,6 +309,7 @@ public class DeviceController {
      * @param ipv4Address 设备IP
      * @return
      */
+    @Deprecated
     @PostMapping("stopCameraRecord/{ipv4Address}")
     public String stopCameraData(@PathVariable String ipv4Address) {
         Integer previewSucValue = ConfigJsonUtil.getDeviceSearchInfoByIp(ipv4Address).getPreviewHandleId();
@@ -304,6 +320,19 @@ public class DeviceController {
         // TODO 停止设备录像
 //        this.hikCameraService.stopCameraData(previewSucValue);
         return "停止成功！";
+    }
+
+    /**
+     * 根据主键id及长度获取所有门禁数据
+     * @param id 主键
+     * @param length 长度
+     * @return
+     */
+    @GetMapping("getAllAccessDataById/{id}")
+    public HikDevResponse getAllAccessDataById(@RequestHeader(value="token") String token, @PathVariable Integer id, Integer length) throws Exception {
+        tokenService.securityCheck(token);
+        JSONObject jsonObject = new JSONObject();
+        return new HikDevResponse().ok("查询成功",jsonObject);
     }
 
 }
