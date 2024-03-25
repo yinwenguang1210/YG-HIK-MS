@@ -331,6 +331,7 @@ public class DeviceController {
     @GetMapping("getAllAccessDataById/{id}")
     public HikDevResponse getAllAccessDataById(@RequestHeader(value="Authorization") String token, @PathVariable Integer id, Integer length) throws Exception {
         tokenService.securityCheck(token);
+        // TODO：这里要做的是将门禁的打卡记录存到业务数据库里，前端通过主键id及长度来获取门禁数据
         JSONObject jsonObject = new JSONObject();
         return new HikDevResponse().ok("查询成功",jsonObject);
     }
